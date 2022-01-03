@@ -12,25 +12,41 @@ import {
   Checkbox,
 } from "@mui/material";
 
-import { History, UReducerAction } from "undomundo";
+import {
+  canRedo,
+  canUndo,
+  History,
+  redo,
+  undo,
+  UReducerAction,
+} from "undomundo";
 
 import { Block, CustomBranchData, ID, PBT, State, Vector } from "../models";
 import { actionCreators } from "../reducer";
+import { UndoRedo } from "./undo-redo";
+import { TimeLine } from "./timeline";
 
 const Root = styled.div`
   display: flex;
-  margin-left: 20px;
+  margin: 20px;
 `;
 
 const Board = styled.div`
   width: 400px;
-  height: 500px;
+  height: 400px;
+  background: #1e1e1e;
   position: relative;
-  border: 1px solid #ddd;
   overflow: hidden;
   user-select: none;
   outline: none;
   margin-bottom: 16px;
+`;
+
+const TimetravelUI = styled.div`
+  margin-left: 20px;
+  margin-right: 20px;
+  width: 160px;
+  flex-shrink: 0;
 `;
 
 const gridSize = 6;
@@ -48,15 +64,16 @@ const isOverlapBetweenBounds = (a: [Vector, Vector], b: [Vector, Vector]) =>
 const Block = styled.div`
   width: ${6 * gridSize}px;
   height: ${6 * gridSize}px;
-  background: red;
+  background: #4ebefb;
   position: absolute;
   user-select: none;
   box-sizing: border-box;
+  transition: opacity 0.3s ease-in-out;
 `;
 
 const Marquee = styled.div`
   background-color: transparent;
-  border: 1px dashed #ccc;
+  border: 1px dashed rgba(255, 255, 255, 0.8);
   position: absolute;
   pointer-events: none;
 `;
@@ -107,7 +124,7 @@ type Props = {
 };
 
 export const Playground: FC<Props> = memo(
-  ({ state, dispatch, isSyncDragEnabled, setIsSyncDragEnabled }) => {
+  ({ state, dispatch, isSyncDragEnabled, setIsSyncDragEnabled, history }) => {
     const [selection, setSelection] = useState<Record<ID, Block>>({});
     const [copied, setCopied] = useState<Record<ID, Block>>({});
     const [dragState, setDragState] = useState<DragState>(null);
@@ -145,6 +162,8 @@ export const Playground: FC<Props> = memo(
     const moveBlocks = (offset: Vector, blocks = getUpdatedSelection()) => {
       dispatch(actionCreators.setPosition(getMovedBlocks(offset, blocks)));
     };
+
+    const hasSelection = Object.keys(selection).length;
 
     return (
       <Root>
@@ -336,12 +355,14 @@ export const Playground: FC<Props> = memo(
                   }}
                   key={id}
                   style={{
+                    // opacity: hasSelection ? 0.6 : 1,
                     left: x * gridSize + "px",
                     top: y * gridSize + "px",
                     borderRadius: shape === "circle" ? "50%" : "unset",
                     border: selection[id]
-                      ? "2px dashed black"
-                      : "2px solid red",
+                      ? // ? "2px dotted #1e1e1e"
+                        "2px dotted white"
+                      : "2px solid #4ebefb",
                   }}
                 />
               );
@@ -393,6 +414,48 @@ export const Playground: FC<Props> = memo(
             />
           </div>
         </div>
+        <TimetravelUI>
+          <UndoRedo
+            undo={() => dispatch(undo())}
+            redo={() => dispatch(redo())}
+            canUndo={canUndo(history)}
+            canRedo={canRedo(history)}
+          ></UndoRedo>
+          <TimeLine
+            history={history}
+            dispatch={dispatch}
+            renderValue={(item, direction) => {
+              if (item.type === "setPosition") {
+                const payload = item.payload[direction];
+                return `Move ${Object.values(payload).length} item(s)`;
+              } else if (item.type === "setPositionRelative") {
+                const payload = item.payload;
+                return `Move (relative) ${
+                  Object.values(payload).length
+                } item(s)`;
+              } else if (item.type === "setShape") {
+                // TODO: show how much of each shape
+                const payload = item.payload[direction];
+                return `Change shape of ${
+                  Object.values(payload).length
+                } item(s)`;
+              } else if (item.type === "add" || item.type === "remove") {
+                const payload = item.payload;
+                const name =
+                  direction === "redo"
+                    ? item.type === "add"
+                      ? "Add"
+                      : "Remove"
+                    : item.type === "add"
+                    ? "Remove"
+                    : "Add";
+                return `${name} ${Object.values(payload).length} item(s)`;
+              } else {
+                return "";
+              }
+            }}
+          />
+        </TimetravelUI>
       </Root>
     );
   }

@@ -3,13 +3,12 @@ import { History, PayloadConfigByType } from "undomundo";
 import { CustomBranchData } from "./models";
 
 const colors = [
-  "red",
-  "green",
-  "blue",
-  "pink",
-  "orange",
-  "yellow",
-  "lightblue",
+  "#CE9178",
+  "#4DB29D",
+  "#569CD6",
+  "#A974A4",
+  "#DADAA9",
+  "#4EBEFA",
 ];
 
 export const initBranchData = <PBT extends PayloadConfigByType>(

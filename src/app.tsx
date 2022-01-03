@@ -14,24 +14,32 @@ import { State, PBT, CustomBranchData } from "./models";
 import { getActionFromStateUpdate, uReducer } from "./reducer";
 
 import { Playground } from "./components/playground";
+import { initBranchData } from "./branch-data";
 
-export const initialUState = initUState<State, PBT, CustomBranchData>({
-  blocks: {
-    a: {
-      id: "a",
-      position: [3, 3],
-      shape: "circle",
-    },
-    b: {
-      id: "b",
-      position: [6, 8],
-      shape: "square",
+export const initialUState = initUState<State, PBT, CustomBranchData>(
+  {
+    blocks: {
+      a: {
+        id: "a",
+        position: [3, 3],
+        shape: "circle",
+      },
+      b: {
+        id: "b",
+        position: [6, 8],
+        shape: "square",
+      },
     },
   },
-});
+  initBranchData()
+);
 
 const Row = styled.div`
   display: flex;
+  height: 100vh;
+  width: 100vw;
+  background: #252526;
+  padding: 20px;
 `;
 
 const last = <T,>(arr: T[]): T | undefined => arr[arr.length - 1];
