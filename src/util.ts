@@ -32,3 +32,5 @@ export const mapPayloadToProp = <T extends ObjWithId, K extends keyof T>(
   payload: Record<ID, T[K]>,
   prop: K
 ) => updateSelected<T>(payload, (obj) => ({ ...obj, [prop]: payload[obj.id] }));
+
+export const last = <T>(arr: T[]): T | undefined => arr[arr.length - 1];

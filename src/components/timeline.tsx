@@ -74,7 +74,7 @@ export const TimeLine = <PBT extends PayloadConfigByType>({
         {currentBranch.stack.length > 0 && (
           <TimelineItem
             color={currentBranch.custom.color}
-            id="start"
+            id={currentBranch.id + "_start"}
             itemPosition={[0, 0]}
             previewValue={renderValue(currentBranch.stack[0], "undo")}
             isActivePast={true}

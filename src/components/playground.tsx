@@ -10,6 +10,7 @@ import {
   FormControlLabel,
   Radio,
   Checkbox,
+  TextField,
 } from "@mui/material";
 
 import {
@@ -25,6 +26,7 @@ import { Block, CustomBranchData, ID, PBT, State, Vector } from "../models";
 import { actionCreators } from "../reducer";
 import { UndoRedo } from "./undo-redo";
 import { TimeLine } from "./timeline";
+import { Client } from "../use-client";
 
 const Root = styled.div`
   display: flex;
@@ -40,6 +42,7 @@ const Board = styled.div`
   user-select: none;
   outline: none;
   margin-bottom: 16px;
+  border: 1px solid #393939;
 `;
 
 const TimetravelUI = styled.div`
@@ -116,347 +119,370 @@ const getMarqueeStyle = ([[left, top], [right, bottom]]: [Vector, Vector]) => {
 };
 
 type Props = {
-  state: State;
-  history: History<PBT, CustomBranchData>;
-  dispatch: Dispatch<UReducerAction<PBT>>;
-  isSyncDragEnabled: boolean;
-  setIsSyncDragEnabled: (checked: boolean) => void;
+  client: Client;
 };
 
-export const Playground: FC<Props> = memo(
-  ({ state, dispatch, isSyncDragEnabled, setIsSyncDragEnabled, history }) => {
-    const [selection, setSelection] = useState<Record<ID, Block>>({});
-    const [copied, setCopied] = useState<Record<ID, Block>>({});
-    const [dragState, setDragState] = useState<DragState>(null);
+export const Playground: FC<Props> = memo(({ client }) => {
+  const {
+    uState,
+    dispatch,
+    isSyncDragEnabled,
+    setIsSyncDragEnabled,
+    syncDown,
+    syncUp,
+    setSyncDown,
+    setSyncUp,
+  } = client;
 
-    const [positioning, setPositioning] = useState(PositioningMode.ABSOLUTE);
+  const { history, state } = uState;
 
-    const containerRef = useRef<HTMLDivElement>(null);
+  const [selection, setSelection] = useState<Record<ID, Block>>({});
+  const [copied, setCopied] = useState<Record<ID, Block>>({});
+  const [dragState, setDragState] = useState<DragState>(null);
 
-    const blocks = Object.values(state.blocks);
+  const [positioning, setPositioning] = useState(PositioningMode.ABSOLUTE);
 
-    const getLocation = (e: React.MouseEvent) => {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const bounds = containerRef.current!.getBoundingClientRect();
-      return vSub([e.clientX, e.clientY], [bounds.left, bounds.top]);
-    };
+  const containerRef = useRef<HTMLDivElement>(null);
 
-    const getFilteredSelection = (): Record<ID, Block> =>
-      pipe(
-        selection,
-        filter<Block>((block) => Boolean(state.blocks[block.id]))
-      );
+  const blocks = Object.values(state.blocks);
 
-    const getUpdatedSelection = (): Record<ID, Block> =>
-      pipe(
-        getFilteredSelection(),
-        map((block) => state.blocks[block.id])
-      );
+  const getLocation = (e: React.MouseEvent) => {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const bounds = containerRef.current!.getBoundingClientRect();
+    return vSub([e.clientX, e.clientY], [bounds.left, bounds.top]);
+  };
 
-    const getMovedBlocks = (offset: Vector, blocks = getUpdatedSelection()) =>
-      pipe(
-        blocks,
-        map((block) => vAdd(offset, block.position))
-      );
+  const getFilteredSelection = (): Record<ID, Block> =>
+    pipe(
+      selection,
+      filter<Block>((block) => Boolean(state.blocks[block.id]))
+    );
 
-    const moveBlocks = (offset: Vector, blocks = getUpdatedSelection()) => {
-      dispatch(actionCreators.setPosition(getMovedBlocks(offset, blocks)));
-    };
+  const getUpdatedSelection = (): Record<ID, Block> =>
+    pipe(
+      getFilteredSelection(),
+      map((block) => state.blocks[block.id])
+    );
 
-    const hasSelection = Object.keys(selection).length;
+  const getMovedBlocks = (offset: Vector, blocks = getUpdatedSelection()) =>
+    pipe(
+      blocks,
+      map((block) => vAdd(offset, block.position))
+    );
 
-    return (
-      <Root>
-        <div>
-          <Board
-            ref={containerRef}
-            onDoubleClick={(e) => {
-              const [x, y] = vSub(getLocation(e), [3 * gridSize, 3 * gridSize]);
-              const id = String(Math.random());
-              dispatch(
-                actionCreators.add({
-                  [id]: { id, position: [snap(x), snap(y)], shape: "circle" },
-                })
-              );
-            }}
-            tabIndex={0}
-            onKeyDown={(e) => {
-              e.preventDefault();
-              if (e.code === "Backspace" || e.code === "Delete") {
-                dispatch(actionCreators.remove(getUpdatedSelection()));
-              } else if (e.metaKey || e.ctrlKey) {
-                if (e.code == "KeyC") {
-                  const updatedSelection = getUpdatedSelection();
-                  if (Object.keys(updatedSelection).length) {
-                    setCopied(updatedSelection);
-                  }
-                } else if (e.code == "KeyV") {
-                  if (Object.keys(copied).length) {
-                    const newBlocks: Record<ID, Block> = Object.fromEntries(
-                      Object.entries(copied).map(([, block]) => {
-                        const id = String(Math.random());
-                        return [id, { ...block, id }];
-                      })
-                    );
-                    dispatch(actionCreators.add(newBlocks));
-                    setSelection(newBlocks);
-                  }
+  const moveBlocks = (offset: Vector, blocks = getUpdatedSelection()) => {
+    dispatch(actionCreators.setPosition(getMovedBlocks(offset, blocks)));
+  };
+
+  const hasSelection = Object.keys(selection).length;
+
+  return (
+    <Root>
+      <div>
+        <Board
+          ref={containerRef}
+          onDoubleClick={(e) => {
+            const [x, y] = vSub(getLocation(e), [3 * gridSize, 3 * gridSize]);
+            const id = String(Math.random());
+            dispatch(
+              actionCreators.add({
+                [id]: { id, position: [snap(x), snap(y)], shape: "circle" },
+              })
+            );
+          }}
+          tabIndex={0}
+          onKeyDown={(e) => {
+            e.preventDefault();
+            if (e.code === "Backspace" || e.code === "Delete") {
+              dispatch(actionCreators.remove(getUpdatedSelection()));
+            } else if (e.metaKey || e.ctrlKey) {
+              if (e.code == "KeyC") {
+                const updatedSelection = getUpdatedSelection();
+                if (Object.keys(updatedSelection).length) {
+                  setCopied(updatedSelection);
                 }
-              } else if (e.code === "ArrowUp") {
-                moveBlocks([0, -1]);
-              } else if (e.code === "ArrowDown") {
-                moveBlocks([0, 1]);
-              } else if (e.code === "ArrowLeft") {
-                moveBlocks([-1, 0]);
-              } else if (e.code === "ArrowRight") {
-                moveBlocks([1, 0]);
-              }
-            }}
-            onMouseDown={(e) => {
-              setSelection({});
-              setDragState({
-                type: "MARQUEE",
-                startLocation: getLocation(e),
-              });
-            }}
-            onMouseUp={() => {
-              if (dragState?.location) {
-                if (dragState.type === "BLOCKS") {
-                  const [offsetX, offsetY] = vSub(
-                    dragState.location,
-                    dragState.startLocation
+              } else if (e.code == "KeyV") {
+                if (Object.keys(copied).length) {
+                  const newBlocks: Record<ID, Block> = Object.fromEntries(
+                    Object.entries(copied).map(([, block]) => {
+                      const id = String(Math.random());
+                      return [id, { ...block, id }];
+                    })
                   );
-
-                  const filteredSelection = getFilteredSelection();
-                  const snappedOffset: [number, number] = [
-                    snap(offsetX),
-                    snap(offsetY),
-                  ];
-
-                  dispatch(
-                    positioning === PositioningMode.ABSOLUTE
-                      ? actionCreators.setPosition(
-                          getMovedBlocks(snappedOffset, filteredSelection),
-                          {
-                            undoValue: pipe(
-                              filteredSelection,
-                              map((block) => block.position)
-                            ),
-                          }
-                        )
-                      : actionCreators.setPositionRelative(
-                          pipe(
-                            filteredSelection,
-                            map(() => snappedOffset)
-                          ),
-                          { skipState: true }
-                        )
-                  );
-                } else if (dragState.type === "MARQUEE") {
-                  const bounds = getMarqueeBounds(
-                    dragState.location,
-                    dragState.startLocation
-                  );
-                  const filtered = filter<Block>((block) =>
-                    isOverlapBetweenBounds(bounds, [
-                      vScale(gridSize, block.position),
-                      vScale(gridSize, vAdd(block.position, [6, 6])),
-                    ])
-                  )(state.blocks);
-                  setSelection(filtered);
+                  dispatch(actionCreators.add(newBlocks));
+                  setSelection(newBlocks);
                 }
               }
-              setDragState(null);
-            }}
-            onMouseMove={(e) => {
-              if (dragState) {
-                const location = getLocation(e);
+            } else if (e.code === "ArrowUp") {
+              moveBlocks([0, -1]);
+            } else if (e.code === "ArrowDown") {
+              moveBlocks([0, 1]);
+            } else if (e.code === "ArrowLeft") {
+              moveBlocks([-1, 0]);
+            } else if (e.code === "ArrowRight") {
+              moveBlocks([1, 0]);
+            }
+          }}
+          onMouseDown={(e) => {
+            setSelection({});
+            setDragState({
+              type: "MARQUEE",
+              startLocation: getLocation(e),
+            });
+          }}
+          onMouseUp={() => {
+            if (dragState?.location) {
+              if (dragState.type === "BLOCKS") {
+                const [offsetX, offsetY] = vSub(
+                  dragState.location,
+                  dragState.startLocation
+                );
 
-                const prevLocation =
-                  dragState.location ?? dragState.startLocation;
-                setDragState({ ...dragState, location });
+                const filteredSelection = getFilteredSelection();
+                const snappedOffset: [number, number] = [
+                  snap(offsetX),
+                  snap(offsetY),
+                ];
 
-                if (dragState.type === "BLOCKS") {
-                  const [offsetX, offsetY] = vSub(
-                    location,
-                    dragState.startLocation
-                  );
-                  const snappedOffset: [number, number] = [
-                    snap(offsetX),
-                    snap(offsetY),
-                  ];
-                  if (positioning === PositioningMode.ABSOLUTE) {
-                    dispatch(
-                      actionCreators.setPosition(
-                        getMovedBlocks(snappedOffset, getFilteredSelection()),
+                dispatch(
+                  positioning === PositioningMode.ABSOLUTE
+                    ? actionCreators.setPosition(
+                        getMovedBlocks(snappedOffset, filteredSelection),
                         {
-                          skipHistory: true,
+                          undoValue: pipe(
+                            filteredSelection,
+                            map((block) => block.position)
+                          ),
                         }
                       )
-                    );
-                  } else {
-                    const [offsetXPrev, offsetYPrev] = vSub(
-                      prevLocation,
-                      dragState.startLocation
-                    );
-                    const snappedOffsetPrev: [number, number] = [
-                      snap(offsetXPrev),
-                      snap(offsetYPrev),
-                    ];
-                    const diff = vSub(snappedOffset, snappedOffsetPrev);
-                    dispatch(
-                      actionCreators.setPositionRelative(
+                    : actionCreators.setPositionRelative(
                         pipe(
-                          getFilteredSelection(),
-                          map(() => diff)
+                          filteredSelection,
+                          map(() => snappedOffset)
                         ),
-                        { skipHistory: true }
+                        { skipState: true }
                       )
-                    );
-                  }
+                );
+              } else if (dragState.type === "MARQUEE") {
+                const bounds = getMarqueeBounds(
+                  dragState.location,
+                  dragState.startLocation
+                );
+                const filtered = filter<Block>((block) =>
+                  isOverlapBetweenBounds(bounds, [
+                    vScale(gridSize, block.position),
+                    vScale(gridSize, vAdd(block.position, [6, 6])),
+                  ])
+                )(state.blocks);
+                setSelection(filtered);
+              }
+            }
+            setDragState(null);
+          }}
+          onMouseMove={(e) => {
+            if (dragState) {
+              const location = getLocation(e);
+
+              const prevLocation =
+                dragState.location ?? dragState.startLocation;
+              setDragState({ ...dragState, location });
+
+              if (dragState.type === "BLOCKS") {
+                const [offsetX, offsetY] = vSub(
+                  location,
+                  dragState.startLocation
+                );
+                const snappedOffset: [number, number] = [
+                  snap(offsetX),
+                  snap(offsetY),
+                ];
+                if (positioning === PositioningMode.ABSOLUTE) {
+                  dispatch(
+                    actionCreators.setPosition(
+                      getMovedBlocks(snappedOffset, getFilteredSelection()),
+                      {
+                        skipHistory: true,
+                      }
+                    )
+                  );
+                } else {
+                  const [offsetXPrev, offsetYPrev] = vSub(
+                    prevLocation,
+                    dragState.startLocation
+                  );
+                  const snappedOffsetPrev: [number, number] = [
+                    snap(offsetXPrev),
+                    snap(offsetYPrev),
+                  ];
+                  const diff = vSub(snappedOffset, snappedOffsetPrev);
+                  dispatch(
+                    actionCreators.setPositionRelative(
+                      pipe(
+                        getFilteredSelection(),
+                        map(() => diff)
+                      ),
+                      { skipHistory: true }
+                    )
+                  );
                 }
               }
-            }}
-          >
-            {blocks.map((block) => {
-              const {
-                id,
-                position: [x, y],
-                shape,
-              } = block;
-              return (
-                <Block
-                  onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    const action = actionCreators.setShape({
-                      [id]: shape === "circle" ? "square" : "circle",
-                    });
-                    dispatch(action);
-                  }}
-                  onMouseDown={(e) => {
-                    e.stopPropagation();
-                    setDragState({
-                      type: "BLOCKS",
-                      startLocation: getLocation(e),
-                    });
-                    const isSelected = Boolean(selection[id]);
-                    const updatedSelection = getUpdatedSelection();
-                    const newSelection = isSelectionKeyDown(e)
-                      ? isSelected
-                        ? deleteAt(id)(updatedSelection)
-                        : {
-                            ...updatedSelection,
-                            [id]: block,
-                          }
-                      : isSelected
-                      ? updatedSelection
-                      : { [id]: block };
-                    setSelection(newSelection);
-                  }}
-                  key={id}
-                  style={{
-                    // opacity: hasSelection ? 0.6 : 1,
-                    left: x * gridSize + "px",
-                    top: y * gridSize + "px",
-                    borderRadius: shape === "circle" ? "50%" : "unset",
-                    border: selection[id]
-                      ? // ? "2px dotted #1e1e1e"
-                        "2px dotted white"
-                      : "2px solid #4ebefb",
-                  }}
-                />
-              );
-            })}
-            {dragState?.type === "MARQUEE" && dragState.location && (
-              <Marquee
+            }
+          }}
+        >
+          {blocks.map((block) => {
+            const {
+              id,
+              position: [x, y],
+              shape,
+            } = block;
+            return (
+              <Block
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  const action = actionCreators.setShape({
+                    [id]: shape === "circle" ? "square" : "circle",
+                  });
+                  dispatch(action);
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  setDragState({
+                    type: "BLOCKS",
+                    startLocation: getLocation(e),
+                  });
+                  const isSelected = Boolean(selection[id]);
+                  const updatedSelection = getUpdatedSelection();
+                  const newSelection = isSelectionKeyDown(e)
+                    ? isSelected
+                      ? deleteAt(id)(updatedSelection)
+                      : {
+                          ...updatedSelection,
+                          [id]: block,
+                        }
+                    : isSelected
+                    ? updatedSelection
+                    : { [id]: block };
+                  setSelection(newSelection);
+                }}
+                key={id}
                 style={{
-                  ...getMarqueeStyle(
-                    getMarqueeBounds(
-                      dragState.location,
-                      dragState.startLocation
-                    )
-                  ),
+                  // opacity: hasSelection ? 0.6 : 1,
+                  left: x * gridSize + "px",
+                  top: y * gridSize + "px",
+                  borderRadius: shape === "circle" ? "50%" : "unset",
+                  border: selection[id]
+                    ? // ? "2px dotted #1e1e1e"
+                      "2px dotted white"
+                    : "2px solid #4ebefb",
                 }}
               />
-            )}
-          </Board>
-          <FormControl component="fieldset">
-            <FormLabel component="legend">Positioning</FormLabel>
-            <RadioGroup
-              row
-              aria-label="positioning"
-              value={positioning}
-              onChange={(_, value) => setPositioning(value as PositioningMode)}
-            >
-              <FormControlLabel
-                value={PositioningMode.ABSOLUTE}
-                control={<Radio color="primary" />}
-                label="Absolute"
-              />
-              <FormControlLabel
-                color="primary"
-                value={PositioningMode.RELATIVE}
-                control={<Radio color="primary" />}
-                label="Relative"
-              />
-            </RadioGroup>
-          </FormControl>
-          <div>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  color="primary"
-                  checked={isSyncDragEnabled}
-                  onChange={(_, checked) => setIsSyncDragEnabled(checked)}
-                />
-              }
-              label="Sync drag operations to other client"
+            );
+          })}
+          {dragState?.type === "MARQUEE" && dragState.location && (
+            <Marquee
+              style={{
+                ...getMarqueeStyle(
+                  getMarqueeBounds(dragState.location, dragState.startLocation)
+                ),
+              }}
             />
-          </div>
-        </div>
-        <TimetravelUI>
-          <UndoRedo
-            undo={() => dispatch(undo())}
-            redo={() => dispatch(redo())}
-            canUndo={canUndo(history)}
-            canRedo={canRedo(history)}
-          ></UndoRedo>
-          <TimeLine
-            history={history}
-            dispatch={dispatch}
-            renderValue={(item, direction) => {
-              if (item.type === "setPosition") {
-                const payload = item.payload[direction];
-                return `Move ${Object.values(payload).length} item(s)`;
-              } else if (item.type === "setPositionRelative") {
-                const payload = item.payload;
-                return `Move (relative) ${
-                  Object.values(payload).length
-                } item(s)`;
-              } else if (item.type === "setShape") {
-                // TODO: show how much of each shape
-                const payload = item.payload[direction];
-                return `Change shape of ${
-                  Object.values(payload).length
-                } item(s)`;
-              } else if (item.type === "add" || item.type === "remove") {
-                const payload = item.payload;
-                const name =
-                  direction === "redo"
-                    ? item.type === "add"
-                      ? "Add"
-                      : "Remove"
-                    : item.type === "add"
-                    ? "Remove"
-                    : "Add";
-                return `${name} ${Object.values(payload).length} item(s)`;
-              } else {
-                return "";
-              }
-            }}
+          )}
+        </Board>
+        <FormControl component="fieldset">
+          <FormLabel component="legend">Positioning</FormLabel>
+          <RadioGroup
+            row
+            aria-label="positioning"
+            value={positioning}
+            onChange={(_, value) => setPositioning(value as PositioningMode)}
+          >
+            <FormControlLabel
+              value={PositioningMode.ABSOLUTE}
+              control={<Radio color="primary" />}
+              label="Absolute"
+            />
+            <FormControlLabel
+              color="primary"
+              value={PositioningMode.RELATIVE}
+              control={<Radio color="primary" />}
+              label="Relative"
+            />
+          </RadioGroup>
+        </FormControl>
+        <div>
+          <FormControlLabel
+            control={
+              <Checkbox
+                color="primary"
+                checked={isSyncDragEnabled}
+                onChange={(_, checked) => setIsSyncDragEnabled(checked)}
+              />
+            }
+            label="Sync drag operations to other client"
           />
-        </TimetravelUI>
-      </Root>
-    );
-  }
-);
+        </div>
+        <div
+          style={{
+            marginTop: "20px",
+            display: "flex",
+            justifyContent: "space-between ",
+          }}
+        >
+          <TextField
+            style={{ marginRight: "20px" }}
+            type="number"
+            value={syncUp}
+            onChange={(evt) => setSyncUp(Number(evt.target.value))}
+            label="sync up (ms)"
+            variant="outlined"
+          />
+          <TextField
+            type="number"
+            value={syncDown}
+            onChange={(evt) => setSyncDown(Number(evt.target.value))}
+            label="sync down (ms)"
+            variant="outlined"
+          />
+        </div>
+      </div>
+      <TimetravelUI>
+        <UndoRedo
+          undo={() => dispatch(undo())}
+          redo={() => dispatch(redo())}
+          canUndo={canUndo(history)}
+          canRedo={canRedo(history)}
+        ></UndoRedo>
+        <TimeLine
+          history={history}
+          dispatch={dispatch}
+          renderValue={(item, direction) => {
+            if (item.type === "setPosition") {
+              const payload = item.payload[direction];
+              return `Move ${Object.values(payload).length} item(s)`;
+            } else if (item.type === "setPositionRelative") {
+              const payload = item.payload;
+              return `Move (relative) ${Object.values(payload).length} item(s)`;
+            } else if (item.type === "setShape") {
+              // TODO: show how much of each shape
+              const payload = item.payload[direction];
+              return `Change shape of ${Object.values(payload).length} item(s)`;
+            } else if (item.type === "add" || item.type === "remove") {
+              const payload = item.payload;
+              const name =
+                direction === "redo"
+                  ? item.type === "add"
+                    ? "Add"
+                    : "Remove"
+                  : item.type === "add"
+                  ? "Remove"
+                  : "Add";
+              return `${name} ${Object.values(payload).length} item(s)`;
+            } else {
+              return "";
+            }
+          }}
+        />
+      </TimetravelUI>
+    </Root>
+  );
+});

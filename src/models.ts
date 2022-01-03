@@ -1,5 +1,10 @@
 import { Endomorphism } from "fp-ts/Endomorphism";
-import { RelativePayloadConfig, AbsolutePayloadConfig } from "undomundo";
+import {
+  RelativePayloadConfig,
+  AbsolutePayloadConfig,
+  PayloadConfigByType,
+  StateUpdate,
+} from "undomundo";
 
 export type ID = string;
 
@@ -41,3 +46,13 @@ export type CustomBranchData = {
   name: string;
   color: string;
 };
+
+export interface Batch<PBT extends PayloadConfigByType> {
+  id: string;
+  updates: StateUpdate<PBT>[];
+}
+
+export interface ServerBatch<PBT extends PayloadConfigByType> {
+  batch: Batch<PBT>;
+  parentId?: string;
+}

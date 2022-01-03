@@ -42,6 +42,7 @@ export const TimelineItem: React.FC<Props> = ({
   return (
     <Tooltip placement="right" arrow title={isActive ? "" : previewValue}>
       <Root
+        id={id}
         layoutId={id}
         style={{
           cursor: isActive ? "default" : "pointer",
