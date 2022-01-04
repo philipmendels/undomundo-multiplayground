@@ -27,12 +27,14 @@ const getInitialUState = () =>
     initBranchData()
   );
 
-export const useClient = () => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const useClient = (id: string) => {
   const [uState, dispatch] = useReducer(uReducer, getInitialUState());
 
   const [isSyncDragEnabled, setIsSyncDragEnabled] = useState(true);
-  const [syncUp, setSyncUp] = useState(1000);
-  const [syncDown, setSyncDown] = useState(1000);
+  const [isDelayed, setIsDelayed] = useState(false);
+  const [syncUpTime, setSyncUpTime] = useState(2);
+  const [syncDownTime, setSyncDownTime] = useState(2);
 
   const log = useRef<Batch<PBT>[]>([]);
 
@@ -81,12 +83,14 @@ export const useClient = () => {
     dispatch,
     isSyncDragEnabled,
     setIsSyncDragEnabled,
-    syncUp,
-    setSyncUp,
-    syncDown,
-    setSyncDown,
+    syncUpTime,
+    setSyncUpTime,
+    syncDownTime,
+    setSyncDownTime,
     log,
     handleUpdate,
+    isDelayed,
+    setIsDelayed,
   };
 };
 

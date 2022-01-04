@@ -1,4 +1,4 @@
-import { Dispatch, FC, memo, useRef, useState } from "react";
+import { FC, memo, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import { pipe } from "fp-ts/function";
 import { deleteAt, filter, map } from "fp-ts/Record";
@@ -13,16 +13,9 @@ import {
   TextField,
 } from "@mui/material";
 
-import {
-  canRedo,
-  canUndo,
-  History,
-  redo,
-  undo,
-  UReducerAction,
-} from "undomundo";
+import { canRedo, canUndo, redo, undo } from "undomundo";
 
-import { Block, CustomBranchData, ID, PBT, State, Vector } from "../models";
+import { Block, ID, Vector } from "../models";
 import { actionCreators } from "../reducer";
 import { UndoRedo } from "./undo-redo";
 import { TimeLine } from "./timeline";
@@ -128,10 +121,12 @@ export const Playground: FC<Props> = memo(({ client }) => {
     dispatch,
     isSyncDragEnabled,
     setIsSyncDragEnabled,
-    syncDown,
-    syncUp,
-    setSyncDown,
-    setSyncUp,
+    syncDownTime,
+    syncUpTime,
+    setSyncDownTime,
+    setSyncUpTime,
+    isDelayed,
+    setIsDelayed,
   } = client;
 
   const { history, state } = uState;
@@ -171,10 +166,19 @@ export const Playground: FC<Props> = memo(({ client }) => {
     );
 
   const moveBlocks = (offset: Vector, blocks = getUpdatedSelection()) => {
-    dispatch(actionCreators.setPosition(getMovedBlocks(offset, blocks)));
+    dispatch(
+      positioning === PositioningMode.ABSOLUTE
+        ? actionCreators.setPosition(getMovedBlocks(offset, blocks))
+        : actionCreators.setPositionRelative(
+            pipe(
+              blocks,
+              map(() => offset)
+            )
+          )
+    );
   };
 
-  const hasSelection = Object.keys(selection).length;
+  // const hasSelection = Object.keys(selection).length;
 
   return (
     <Root>
@@ -423,26 +427,57 @@ export const Playground: FC<Props> = memo(({ client }) => {
         </div>
         <div
           style={{
-            marginTop: "20px",
+            // marginTop: "20px",
+            height: "45px",
             display: "flex",
-            justifyContent: "space-between ",
+            alignItems: "center",
+            // justifyContent: "space-between ",
           }}
         >
-          <TextField
-            style={{ marginRight: "20px" }}
-            type="number"
-            value={syncUp}
-            onChange={(evt) => setSyncUp(Number(evt.target.value))}
-            label="sync up (ms)"
-            variant="outlined"
+          <FormControlLabel
+            control={
+              <Checkbox
+                color="primary"
+                checked={isDelayed}
+                onChange={(_, checked) => setIsDelayed(checked)}
+              />
+            }
+            label="Sync delay (sec)"
           />
-          <TextField
-            type="number"
-            value={syncDown}
-            onChange={(evt) => setSyncDown(Number(evt.target.value))}
-            label="sync down (ms)"
-            variant="outlined"
-          />
+          {isDelayed && (
+            <>
+              <div
+                style={{
+                  marginLeft: "8px",
+                }}
+              >
+                up:
+              </div>
+              <TextField
+                style={{
+                  margin: "6px 20px 0 20px",
+                  width: "40px",
+                }}
+                type="number"
+                value={syncUpTime}
+                onChange={(evt) => setSyncUpTime(Number(evt.target.value))}
+                variant="standard"
+                size="small"
+              />
+              <div>down:</div>
+              <TextField
+                style={{
+                  margin: "6px 0 0 20px",
+                  width: "40px",
+                }}
+                type="number"
+                value={syncDownTime}
+                onChange={(evt) => setSyncDownTime(Number(evt.target.value))}
+                variant="standard"
+                size="small"
+              />
+            </>
+          )}
         </div>
       </div>
       <TimetravelUI>
@@ -461,7 +496,7 @@ export const Playground: FC<Props> = memo(({ client }) => {
               return `Move ${Object.values(payload).length} item(s)`;
             } else if (item.type === "setPositionRelative") {
               const payload = item.payload;
-              return `Move (relative) ${Object.values(payload).length} item(s)`;
+              return `Move ${Object.values(payload).length} item(s)`;
             } else if (item.type === "setShape") {
               // TODO: show how much of each shape
               const payload = item.payload[direction];

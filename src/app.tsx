@@ -29,24 +29,35 @@ const handleEffect = (
       id: v4(),
     };
     client.log.current.push(batch);
-    setTimeout(() => {
+
+    const syncUp = () => {
       const parentId = last(serverLog.current)?.id;
       serverLog.current.push(batch);
       const serverBatch: ServerBatch<PBT> = {
         batch,
         parentId,
       };
-      setTimeout(() => {
+      if (otherClient.isDelayed) {
+        setTimeout(() => {
+          otherClient.handleUpdate(serverBatch);
+        }, otherClient.syncDownTime * 1000);
+      } else {
         otherClient.handleUpdate(serverBatch);
-      }, otherClient.syncDown);
-    }, client.syncUp);
+      }
+    };
+
+    if (client.isDelayed) {
+      setTimeout(syncUp, client.syncUpTime * 1000);
+    } else {
+      syncUp();
+    }
   }
 };
 
 export const App: FC = () => {
-  const client1 = useClient();
+  const client1 = useClient("A");
 
-  const client2 = useClient();
+  const client2 = useClient("B");
 
   const serverLog = useRef<Batch<PBT>[]>([]);
 
