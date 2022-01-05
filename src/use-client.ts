@@ -1,4 +1,4 @@
-import { useReducer, useState, useRef } from "react";
+import { useReducer, useState, useRef, useCallback } from "react";
 import { unstable_batchedUpdates } from "react-dom";
 
 import { initUState, SyncActionUnion } from "undomundo";
@@ -27,7 +27,6 @@ const getInitialUState = () =>
     initBranchData()
   );
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const useClient = (id: string) => {
   const [uState, dispatch] = useReducer(uReducer, getInitialUState());
 
@@ -39,44 +38,69 @@ export const useClient = (id: string) => {
   const log = useRef<Batch<PBT>[]>([]);
 
   const handleActions = (actions: SyncActionUnion<PBT>[]) => {
-    unstable_batchedUpdates(() => {
-      actions.forEach(dispatch);
-    });
+    actions.forEach(dispatch);
   };
 
-  const handleUpdate = (serverBatch: ServerBatch<PBT>) => {
-    const convert = getActionFromStateUpdate({ isSynchronizing: true });
-    const revert = getActionFromStateUpdate({
-      isSynchronizing: true,
-      invertAction: true,
-    });
-    const { batch } = serverBatch;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    if (!log.current.length || last(log.current)!.id === serverBatch.parentId) {
-      log.current.push(batch);
-      handleActions(batch.updates.map(convert));
-    } else {
-      const idx = !serverBatch.parentId
-        ? -1
-        : log.current.findIndex((batch) => batch.id === serverBatch.parentId);
-      if (serverBatch.parentId && idx === -1) {
-        throw Error(
-          "client received update out of sync, parent is not yet here"
-        );
+  const handleUpdate = useCallback(
+    (serverBatch: ServerBatch<PBT>) => {
+      // console.log(
+      //   "handle update",
+      //   id,
+      //   serverBatch.batch.id,
+      //   serverBatch.parentId,
+      //   log.current.map((batch) => batch.id.slice(0, 4)).join(", ")
+      // );
+      const convert = getActionFromStateUpdate({ isSynchronizing: true });
+      const revert = getActionFromStateUpdate({
+        isSynchronizing: true,
+        invertAction: true,
+      });
+      const { batch } = serverBatch;
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      if (
+        !log.current.length ||
+        last(log.current)!.id === serverBatch.parentId
+      ) {
+        log.current = [batch];
+        unstable_batchedUpdates(() => {
+          handleActions(batch.updates.map(convert));
+        });
+      } else {
+        const idx = !serverBatch.parentId
+          ? -1
+          : log.current.findIndex((batch) => batch.id === serverBatch.parentId);
+
+        if (serverBatch.parentId && idx === -1) {
+          throw Error(
+            `Client ${id} received update ${
+              batch.id
+            } out of sync. Parent update ${
+              serverBatch.parentId
+            } is not found. Current log is: ${log.current
+              .map((batch) => batch.id.slice(0, 4))
+              .join(", ")}.`
+          );
+        }
+
+        const toRevert = log.current.slice(idx + 1);
+        log.current = [batch, ...toRevert];
+
+        unstable_batchedUpdates(() => {
+          handleActions(
+            toRevert
+              .flatMap((batch) => batch.updates)
+              .reverse()
+              .map(revert)
+          );
+          handleActions(batch.updates.map(convert));
+          handleActions(
+            toRevert.flatMap((batch) => batch.updates).map(convert)
+          );
+        });
       }
-      const toRevert = log.current.splice(idx + 1);
-      handleActions(
-        toRevert
-          .flatMap((batch) => batch.updates)
-          .reverse()
-          .map(revert)
-      );
-      log.current.push(batch);
-      handleActions(batch.updates.map(convert));
-      log.current.push(...toRevert);
-      handleActions(toRevert.flatMap((batch) => batch.updates).map(convert));
-    }
-  };
+    },
+    [id]
+  );
 
   return {
     uState,
@@ -91,6 +115,7 @@ export const useClient = (id: string) => {
     handleUpdate,
     isDelayed,
     setIsDelayed,
+    id,
   };
 };
 

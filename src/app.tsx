@@ -1,4 +1,4 @@
-import { FC, useEffect, useRef } from "react";
+import { FC, StrictMode, useEffect, useRef } from "react";
 import styled from "@emotion/styled";
 import { v4 } from "uuid";
 
@@ -23,20 +23,33 @@ const handleEffect = (
   const updates = client.isSyncDragEnabled
     ? client.uState.stateUpdates.filter((update) => !update.skipState)
     : client.uState.stateUpdates.filter((update) => !update.skipHistory);
+
   if (updates.length) {
     const batch: Batch<PBT> = {
       updates,
       id: v4(),
     };
+
+    // console.log(
+    //   "make update",
+    //   client.id,
+    //   batch.id,
+    //   client.log.current.map((batch) => batch.id.slice(0, 4)).join(", ")
+    // );
+
     client.log.current.push(batch);
 
     const syncUp = () => {
       const parentId = last(serverLog.current)?.id;
-      serverLog.current.push(batch);
+      serverLog.current = [batch];
+
       const serverBatch: ServerBatch<PBT> = {
         batch,
         parentId,
       };
+
+      // console.log("update on server", client.id, batch.id, parentId);
+
       if (otherClient.isDelayed) {
         setTimeout(() => {
           otherClient.handleUpdate(serverBatch);
@@ -72,9 +85,11 @@ export const App: FC = () => {
   }, [client2.uState.stateUpdates]);
 
   return (
-    <Row>
-      <Playground client={client1} />
-      <Playground client={client2} />
-    </Row>
+    <StrictMode>
+      <Row>
+        <Playground client={client1} />
+        <Playground client={client2} />
+      </Row>
+    </StrictMode>
   );
 };
