@@ -1,7 +1,7 @@
 import { useReducer, useState, useRef, useCallback } from "react";
 import { unstable_batchedUpdates } from "react-dom";
 
-import { initUState, SyncActionUnion } from "undomundo";
+import { createEmptyHistory, initUState, SyncActionUnion } from "undomundo";
 import { initBranchData } from "./branch-data";
 
 import { Batch, CustomBranchData, PBT, ServerBatch, State } from "./models";
@@ -24,7 +24,7 @@ const getInitialUState = () =>
         },
       },
     },
-    initBranchData()
+    initBranchData(createEmptyHistory())
   );
 
 export const useClient = (id: string) => {

@@ -7,6 +7,7 @@
     "jsxImportSource": "@emotion/react",
     "isolatedModules": true /* needed for parcel */,
     "strict": true /* Enable all strict type-checking options. */,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true
   }
 }

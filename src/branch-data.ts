@@ -1,6 +1,6 @@
-import { History, PayloadConfigByType } from "undomundo";
+import { InitBranchData } from "undomundo";
 
-import { CustomBranchData } from "./models";
+import { CustomBranchData, PBT } from "./models";
 
 const colors = [
   "#CE9178",
@@ -11,14 +11,12 @@ const colors = [
   "#4EBEFA",
 ];
 
-export const initBranchData = <PBT extends PayloadConfigByType>(
-  history?: History<PBT, CustomBranchData>
-): CustomBranchData => {
-  const usedColors = Object.values(history?.branches || {}).map(
-    (b) => b.custom.color
-  );
+export const initBranchData: InitBranchData<PBT, CustomBranchData> = (
+  history
+) => {
+  const usedColors = Object.values(history.branches).map((b) => b.custom.color);
   return {
-    name: `branch ${(history?.stats.branchCounter || 0) + 1}`,
-    color: colors.find((c) => !usedColors.includes(c)) || "light-gray",
+    name: `branch ${history.stats.branchCounter + 1}`,
+    color: colors.find((c) => !usedColors.includes(c)) || colors[0],
   };
 };
