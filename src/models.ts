@@ -1,6 +1,6 @@
 import { Endomorphism } from "fp-ts/Endomorphism";
 import {
-  RelativePayloadConfig,
+  CustomPayloadConfig,
   AbsolutePayloadConfig,
   PayloadConfigByType,
   StateUpdate,
@@ -35,11 +35,11 @@ export type State = {
 };
 
 export type PBT = {
-  add: RelativePayloadConfig<Record<ID, Block | null>>;
-  remove: RelativePayloadConfig<Record<ID, Block | null>>;
+  add: CustomPayloadConfig<Record<ID, Block | null>>;
+  remove: CustomPayloadConfig<Record<ID, Block | null>>;
   setShape: AbsolutePayloadConfig<Record<ID, Shape>>;
   setPosition: AbsolutePayloadConfig<Record<ID, Vector>>;
-  setPositionRelative: RelativePayloadConfig<Record<ID, Vector>>;
+  setPositionRelative: CustomPayloadConfig<Record<ID, Vector>>;
 };
 
 export type CustomBranchData = {
