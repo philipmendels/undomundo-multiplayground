@@ -1,2 +1,5 @@
 # undomundo-multiplayground
-experiment with undomundo in a fake multiplayer setting
+
+Experiment with undomundo in a fake multiplayer setting.
+
+https://philipmendels.github.io/undomundo-multiplayground/
