@@ -1,3 +1,5 @@
+import { pipe } from "fp-ts/function";
+import { filterWithIndex } from "fp-ts/Record";
 import { useReducer, useState, useRef, useCallback } from "react";
 import { unstable_batchedUpdates } from "react-dom";
 
@@ -6,7 +8,7 @@ import { initBranchData } from "./branch-data";
 
 import { Batch, CustomBranchData, PBT, ServerBatch, State } from "./models";
 import { uReducer, getActionFromStateUpdate } from "./reducer";
-import { last } from "./util";
+import { evolve, last } from "./util";
 
 const getInitialUState = () =>
   initUState<State, PBT, CustomBranchData>(
@@ -27,6 +29,12 @@ const getInitialUState = () =>
     initBranchData(createEmptyHistory())
   );
 
+const convert = getActionFromStateUpdate({ isSynchronizing: true });
+const revert = getActionFromStateUpdate({
+  isSynchronizing: true,
+  invertAction: true,
+});
+
 export const useClient = (id: string) => {
   const [uState, dispatch] = useReducer(uReducer, getInitialUState());
 
@@ -35,7 +43,11 @@ export const useClient = (id: string) => {
   const [syncUpTime, setSyncUpTime] = useState(2);
   const [syncDownTime, setSyncDownTime] = useState(2);
 
+  // For reverting out-of-sync actions
   const log = useRef<Batch<PBT>[]>([]);
+
+  // For rejecting conflicting incoming absolute updates
+  const unconfirmedUpdates = useRef<Batch<PBT>[]>([]);
 
   const handleActions = (actions: SyncActionUnion<PBT>[]) => {
     actions.forEach(dispatch);
@@ -43,18 +55,6 @@ export const useClient = (id: string) => {
 
   const handleUpdate = useCallback(
     (serverBatch: ServerBatch<PBT>) => {
-      // console.log(
-      //   "handle update",
-      //   id,
-      //   serverBatch.batch.id,
-      //   serverBatch.parentId,
-      //   log.current.map((batch) => batch.id.slice(0, 4)).join(", ")
-      // );
-      const convert = getActionFromStateUpdate({ isSynchronizing: true });
-      const revert = getActionFromStateUpdate({
-        isSynchronizing: true,
-        invertAction: true,
-      });
       const { batch } = serverBatch;
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       if (
@@ -102,6 +102,49 @@ export const useClient = (id: string) => {
     [id]
   );
 
+  const pushAbsUpdate = (batch: Batch<PBT>) => {
+    const unconfirmedActions = unconfirmedUpdates.current.flatMap((b) =>
+      b.updates.map(convert)
+    );
+    const actions = batch.updates.map(convert).map((action) => {
+      if (
+        action.type === "add" ||
+        action.type === "remove" ||
+        action.type === "setPositionRelative"
+      ) {
+        return action;
+      } else {
+        const sameActions = unconfirmedActions.filter(
+          (a) => a.type === action.type
+        );
+        return pipe(
+          action,
+          evolve({
+            payload: filterWithIndex(
+              (id) => !sameActions.find((a) => a.payload[id] !== undefined)
+            ),
+          })
+        );
+      }
+    });
+    unstable_batchedUpdates(() => {
+      handleActions(actions);
+    });
+  };
+
+  const confirmAbsUpdate = (updateId: string) => {
+    if (!unconfirmedUpdates.current.length) {
+      throw new Error("no outgoing update to confirm");
+    } else {
+      const update = unconfirmedUpdates.current[0];
+      if (update.id !== updateId) {
+        throw new Error("unexpected id to confirm");
+      } else {
+        unconfirmedUpdates.current.shift();
+      }
+    }
+  };
+
   return {
     uState,
     dispatch,
@@ -116,6 +159,9 @@ export const useClient = (id: string) => {
     isDelayed,
     setIsDelayed,
     id,
+    unconfirmedUpdates,
+    confirmAbsUpdate,
+    pushAbsUpdate,
   };
 };
 
