@@ -1,7 +1,8 @@
 import { FC, memo, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import { pipe } from "fp-ts/function";
-import { deleteAt, filter, map } from "fp-ts/Record";
+import { deleteAt, filter, map, fromEntries } from "fp-ts/Record";
+import { mapWithIndex as mapArray } from "fp-ts/Array";
 import { vAdd, vScale, vSub } from "vec-la-fp";
 import {
   FormControl,
@@ -12,6 +13,7 @@ import {
   Checkbox,
   TextField,
 } from "@mui/material";
+import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 
 import { canRedo, canUndo, redo, undo } from "undomundo";
 
@@ -20,6 +22,9 @@ import { actionCreators } from "../reducer";
 import { UndoRedo } from "./undo-redo";
 import { TimeLine } from "./timeline";
 import { Client } from "../use-client";
+import { v4 } from "uuid";
+import { last } from "../util";
+import { values } from "fp-ts-std/Record";
 
 const Root = styled.div`
   display: flex;
@@ -115,6 +120,15 @@ type Props = {
   client: Client;
 };
 
+const sortBlocks = (blocks: Block[]) =>
+  blocks.slice().sort((a, b) => {
+    if (a.frIndex === b.frIndex) {
+      return a.id > b.id ? 1 : -1;
+    } else {
+      return a.frIndex > b.frIndex ? 1 : -1;
+    }
+  });
+
 export const Playground: FC<Props> = memo(({ client }) => {
   const {
     uState,
@@ -139,7 +153,7 @@ export const Playground: FC<Props> = memo(({ client }) => {
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const blocks = Object.values(state.blocks);
+  const blocks = pipe(state.blocks, values, sortBlocks);
 
   const getLocation = (e: React.MouseEvent) => {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -187,10 +201,18 @@ export const Playground: FC<Props> = memo(({ client }) => {
           ref={containerRef}
           onDoubleClick={(e) => {
             const [x, y] = vSub(getLocation(e), [3 * gridSize, 3 * gridSize]);
-            const id = String(Math.random());
+            const id = v4();
             dispatch(
               actionCreators.add({
-                [id]: { id, position: [snap(x), snap(y)], shape: "circle" },
+                [id]: {
+                  id,
+                  position: [snap(x), snap(y)],
+                  shape: "circle",
+                  frIndex: generateKeyBetween(
+                    last(blocks)?.frIndex ?? null,
+                    null
+                  ),
+                },
               })
             );
           }}
@@ -206,12 +228,25 @@ export const Playground: FC<Props> = memo(({ client }) => {
                   setCopied(updatedSelection);
                 }
               } else if (e.code == "KeyV") {
-                if (Object.keys(copied).length) {
-                  const newBlocks: Record<ID, Block> = Object.fromEntries(
-                    Object.entries(copied).map(([, block]) => {
-                      const id = String(Math.random());
-                      return [id, { ...block, id }];
-                    })
+                const amount = Object.keys(copied).length;
+                if (amount) {
+                  const newIndexes = generateNKeysBetween(
+                    last(blocks)?.frIndex ?? null,
+                    null,
+                    amount
+                  );
+                  const newBlocks = pipe(
+                    copied,
+                    values,
+                    sortBlocks,
+                    mapArray((idx, block) => {
+                      const id = v4();
+                      return [
+                        id,
+                        { ...block, id, frIndex: newIndexes[idx] },
+                      ] as [string, Block];
+                    }),
+                    fromEntries
                   );
                   dispatch(actionCreators.add(newBlocks));
                   setSelection(newBlocks);
@@ -272,12 +307,15 @@ export const Playground: FC<Props> = memo(({ client }) => {
                   dragState.location,
                   dragState.startLocation
                 );
-                const filtered = filter<Block>((block) =>
-                  isOverlapBetweenBounds(bounds, [
-                    vScale(gridSize, block.position),
-                    vScale(gridSize, vAdd(block.position, [6, 6])),
-                  ])
-                )(state.blocks);
+                const filtered = pipe(
+                  state.blocks,
+                  filter((block) =>
+                    isOverlapBetweenBounds(bounds, [
+                      vScale(gridSize, block.position),
+                      vScale(gridSize, vAdd(block.position, [6, 6])),
+                    ])
+                  )
+                );
                 setSelection(filtered);
               }
             }

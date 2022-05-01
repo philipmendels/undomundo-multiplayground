@@ -1,28 +1,35 @@
 import { pipe } from "fp-ts/function";
 import { filterWithIndex } from "fp-ts/Record";
+import { generateNKeysBetween } from "fractional-indexing";
 import { useReducer, useState, useRef, useCallback } from "react";
 import { unstable_batchedUpdates } from "react-dom";
 
 import { createEmptyHistory, initUState, SyncActionUnion } from "undomundo";
+import { v4 } from "uuid";
 import { initBranchData } from "./branch-data";
 
 import { Batch, CustomBranchData, PBT, ServerBatch, State } from "./models";
 import { uReducer, getActionFromStateUpdate } from "./reducer";
 import { evolve, last } from "./util";
 
+const ids = [v4(), v4()];
+const frIndexes = generateNKeysBetween(null, null, 2);
+
 const getInitialUState = () =>
   initUState<State, PBT, CustomBranchData>(
     {
       blocks: {
-        a: {
-          id: "a",
+        [ids[0]]: {
+          id: ids[0],
           position: [3, 3],
           shape: "circle",
+          frIndex: frIndexes[0],
         },
-        b: {
-          id: "b",
+        [ids[1]]: {
+          id: ids[1],
           position: [6, 8],
           shape: "square",
+          frIndex: frIndexes[1],
         },
       },
     },

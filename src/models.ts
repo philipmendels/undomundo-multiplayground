@@ -25,6 +25,7 @@ export type Shape = "square" | "circle";
 export type Vector = [number, number];
 
 export type Block = {
+  frIndex: string;
   shape: Shape;
   position: Vector;
   id: ID;
